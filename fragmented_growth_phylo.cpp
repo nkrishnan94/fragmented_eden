@@ -12,15 +12,15 @@
 #include <gsl/gsl_rng.h>
 #include <gsl/gsl_randist.h>
 #include <algorithm>
-
+#include <tuple>
 
 ///-----------SIMULATION PARAMETERS--------
 const int nDemes = 200; /// side length of square simulation lattice
 int initRad = 10; // initial innoculation radius in demes
-int patchS = 100;
-int patchP = 5;
+int patchS = 10;
+int patchP = 30;
 unsigned int seedID = 2; //rng sseed
-unsigned int nGen = 100;
+unsigned int nGen = 25;
 
 
 
@@ -66,17 +66,19 @@ int main (int argc, char * argv[]){
 	//int sysRandom;
 	gsl_rng_set(r, seedID); ///initialized rng
 	default_random_engine generator;
+	//std::mt19937 gen( rd()) ;
+	auto gen = std::default_random_engine(seedID);
 
 	/////-----INITIALIZE ADDITIONAL PARAMETERS_-----------
 	vector <int> iRand;
 	vector <int> jRand;
-	vector <int> lHistory;
+	vector<std::tuple<int, int, int,  int ,int ,int> > lHistory;  //parent ID, parent x, perent y, child x,child y,t
 
 
 
-	///--------INITIALIZE DATA FILES---------
+
 	//--------INITIALIZE DATA FILES -----
-	ofstream flog, fprof,fpatch,fhistory;
+	ofstream flog, fprof,fpatch,fhist;
 	time_t time_start;
 	clock_t c_init = clock();
 	struct tm * timeinfo;
@@ -100,7 +102,7 @@ int main (int argc, char * argv[]){
 	string logName = "log_" + param_string + date_time.str() + ".txt";
 	string profName = "prof_" + param_string + date_time.str() + ".txt";
 	string patchName = "patch_" + param_string + date_time.str() + ".txt";
-	string historyName = "history_" + param_string + date_time.str() + ".txt";
+	string historyName = "hist_" + param_string + date_time.str() + ".txt";
 
 
 
@@ -108,7 +110,7 @@ int main (int argc, char * argv[]){
 	string folder="";
     flog.open(folder+logName);
     fprof.open(folder+profName);
-    fhistory.open(folder+historyName);
+    fhist.open(folder+historyName);
     fpatch.open(folder+patchName);
 
 
@@ -176,8 +178,8 @@ int main (int argc, char * argv[]){
 
 	for (int dt = 0 ; dt < nGen; dt++ ){
 
-		random_shuffle(iRand.begin(),iRand.end());
-		random_shuffle(jRand.begin(),jRand.end());
+		shuffle(iRand.begin(),iRand.end(),gen);
+		shuffle(jRand.begin(),jRand.end(),gen );
 
 		for(int i =0;i<nDemes;i++){
 
@@ -193,7 +195,6 @@ int main (int argc, char * argv[]){
 					int neighbCorr[4][2]; // initialize array for neighbor coordinates
 					vector <int> neighbEmpty;
 					
-
 
 					int emptCount=0;
 					for(int ne=0; ne <4; ne++){
@@ -214,13 +215,13 @@ int main (int argc, char * argv[]){
 						uniform_int_distribution<int> distribution_e(0,emptCount-1);
 						int nePick = distribution_e(generator);
 
-						popArr[ neighbCorr[ neighbEmpty[nePick] ] [0] ][ neighbCorr[ neighbEmpty[nePick] ] [1] ] =popArr[ii][jj];
+						popArr[ neighbCorr[ neighbEmpty[nePick] ] [0] ] [ neighbCorr[ neighbEmpty[nePick] ] [1] ] =popArr[ii][jj];
 
 						if (patchArr[ii][jj] ==0){
 
 							popArr[ii][jj] = 0;
 						} else{
-							lHistory.push_back(popArr[ii][jj]);
+							lHistory.push_back(    make_tuple( popArr[ii][jj],ii,jj, neighbCorr[ neighbEmpty[nePick] ] [0],neighbCorr[ neighbEmpty[nePick] ] [1],  dt)   );
 						}
 					}
 				}
@@ -229,12 +230,22 @@ int main (int argc, char * argv[]){
 
 		}
 		
-
 	}
-	for(int i=0; i < lHistory.size();i++){
 
-		fhistory << lHistory[i] << endl;
-	}
+
+
+
+	//for(int i=0; i < lHistory.size();i++){
+	//	for( int j =0 j <)
+
+	//		fhistory << lHistory[i] << endl;
+	//}
+
+
+    for (auto [ pID, pX, pY,cX,cY,T ] : lHistory)
+    {
+      fhist << pID << " " << pX << " " << pY << " "<<cX <<" "<<cY<< " "<< T << "\n"<<endl;
+    }
 
 
 	for(int i=0;i < nDemes; i++){
@@ -246,6 +257,10 @@ int main (int argc, char * argv[]){
 		}
 
     }
+
+
+
+    
 
 	flog.close();
     fprof.close();
