@@ -14,22 +14,91 @@
 #include <algorithm>
 #include <tuple>
 
+
+
 ///-----------SIMULATION PARAMETERS--------
-const int nDemes = 200; /// side length of square simulation lattice
-int initRad = 10; // initial innoculation radius in demes
-int patchS = 10;
-int patchP = 30;
-unsigned int seedID = 2; //rng sseed
-unsigned int nGen = 25;
+const int nDemes = 1001; /// side length of square simulation lattice
+int initRad = 50; // initial innoculation radius in demes
+int patchS = 20;
+int patchP = 5;
+unsigned int seedID = 37; //rng sseed
+unsigned int nGen = 500000;
+
+
+int checkEmpty(int popA[nDemes][nDemes], int x, int y, const int arrSize ){
+
+	int arr[2] = {x, y}; // store current lattice coordinates
+	int neighbDiff[4][2] = {{0,1},{0,-1},{1,0},{-1,0}}; //directions for negihbors
+	int neighbCoor[4][2]; // initialize array for neighbor coordinates
+	std::vector <int> neighbEmpty;
+	//int fullCount =0;
+	int ne =0;
+	int emptyFlag =0;
+
+
+	while ((ne <4 ) && (emptyFlag ==0 )){
+
+		neighbCoor[ne][0] = (arr[0] + nDemes+neighbDiff[ne][0]) % nDemes; 
+		neighbCoor[ne][1] = (arr[1] + nDemes+neighbDiff[ne][1]) % nDemes;
+
+		if (popA[ neighbCoor[ne][0] ][ neighbCoor[ne][1] ] == 0){
+
+			emptyFlag=1;
+		}
+		ne+=1;
+	}
+
+	return emptyFlag; //returns 1 if an empty neighbor is present, otherwise 0;
+
+}
 
 
 
+int* pickEmpty(int popA[nDemes][nDemes], int x, int y, const int arrSize, const gsl_rng *R){
 
-long double popArr[nDemes][nDemes] = {{0}}; ///array for pop count for each species at ecah lattice site
-long double patchArr[nDemes][nDemes] = {{0}}; //holder array for pop count for each species at ecah lattice site before migration
 
-//int patchCoor[patchP][2] = {{0}};
+	int arr[2] = {x, y}; // store current lattice coordinates
+	int neighbDiff[4][2] = {{0,1},{0,-1},{1,0},{-1,0}}; //directions for negihbors
+	int neighbCoor[4][2]; // initialize array for neighbor coordinates
+	std::vector <int> neighbEmpty;
 
+
+	for (int ne =0; ne< 4;ne ++){
+
+		neighbCoor[ne][0] = (arr[0] + nDemes+neighbDiff[ne][0]) % nDemes; 
+		neighbCoor[ne][1] = (arr[1] + nDemes+neighbDiff[ne][1]) % nDemes;
+		
+		if (popA[ neighbCoor[ne][0] ][ neighbCoor[ne][1] ] ==0 ){
+
+			neighbEmpty.push_back(ne);
+
+		}
+
+	}
+
+
+
+	if (neighbEmpty.size()==0 ){
+		std::cout << "Deme supposed to have empty neighbor " << std::endl;
+        exit(EXIT_FAILURE);
+	}
+
+	int nePick = gsl_rng_uniform_int(R, neighbEmpty.size() );
+
+
+	//std::vector <int> neighbCoorVec{neighbCoor[ neighbEmpty[nePick] ] [0], neighbCoor[ neighbEmpty[nePick] ] [1]};
+	//neighbCoorVec = {neighbCoor[ neighbEmpty[nePick] ] [0], neighbCoor[ neighbEmpty[nePick] ] [1]};
+
+	//neighbCoorVec.push_back(neighbCoor[ neighbEmpty[nePick] ] [0]);
+	//neighbCoorVec.push_back(neighbCoor[ neighbEmpty[nePick] ] [1] );
+	int neighbCoorVec[2] = {neighbCoor[ neighbEmpty[nePick] ] [0], neighbCoor[ neighbEmpty[nePick] ] [1]};
+
+	
+
+
+	return neighbCoorVec;
+
+}
 
 
 
@@ -54,6 +123,7 @@ int main (int argc, char * argv[]){
     }
 
 
+
     /////-------INIITIALIZE RNG------///
 
     const gsl_rng_type * T;
@@ -65,16 +135,16 @@ int main (int argc, char * argv[]){
 	r = gsl_rng_alloc(T);
 	//int sysRandom;
 	gsl_rng_set(r, seedID); ///initialized rng
-	default_random_engine generator;
+	//default_random_engine generator;
 	//std::mt19937 gen( rd()) ;
-	auto gen = std::default_random_engine(seedID);
+	//auto gen = std::default_random_engine(seedID);
 
 	/////-----INITIALIZE ADDITIONAL PARAMETERS_-----------
-	vector <int> iRand;
-	vector <int> jRand;
-	vector<std::tuple<int, int, int,  int ,int ,int> > lHistory;  //parent ID, parent x, perent y, child x,child y,t
+	vector <int> cellList;
+	vector<std::tuple<int, int, int,  int ,int ,int> > lHistory;
 
-
+	int patchArr[nDemes][nDemes] = {{0}};
+	int popArr[nDemes][nDemes] = {{0}}; 
 
 
 	//--------INITIALIZE DATA FILES -----
@@ -93,6 +163,7 @@ int main (int argc, char * argv[]){
 
 	ostringstream date_time, Rstr, Istr;
 	date_time << buffer;
+
 	Rstr << initRad;
 	Istr << seedID;
 	string param_string =  "R"+Rstr.str()+"_I"+Istr.str()+"_";
@@ -113,9 +184,14 @@ int main (int argc, char * argv[]){
     fhist.open(folder+historyName);
     fpatch.open(folder+patchName);
 
+    cout <<"Start Time: " << date_time.str() << endl;
 
+    //int labelUnique =1;
+    //int x = int(nDemes/2)+1;
+    //int y =int(nDemes/2)+1;
+	//popArr[x][y] =1;  
+	//cellList.push_back(x*nDemes + y);
 
-    //------INITIALIZE RADIAL INNOCULATION---------
     int labelUnique =1;
 	for(int i = 0; i < int(nDemes); i++){
 		for(int j = 0; j < int(nDemes); j++){
@@ -129,31 +205,29 @@ int main (int argc, char * argv[]){
 		}
 	}
 
-	//for (int p=0; p<patchP; p++ ){
-	//	patchCoor[p][0] = 
-	//	patch
 
+	for(int i = 0; i < int(nDemes); i++){
+		for(int j = 0; j < int(nDemes); j++){
+			if ( round(sqrt( abs(i-int(nDemes*.5))*abs(i-int(nDemes*.5)) + abs(j-int(nDemes*.5))*abs(j-int(nDemes*.5))) ) < initRad )
+			{
+				if (checkEmpty(popArr, i,j,nDemes)==1){
 
-
-	///}
-	////----initiaize PATTCHES ----///
-	uniform_int_distribution<int> distribution_p(0,nDemes);
-	for(int p=0; p<patchP;p++){
-
-		int centerX = distribution_p(generator);
-		int centerY = distribution_p(generator);
-
-
-		for(int i = 0; i < int(nDemes); i++){
-			for(int j = 0; j < int(nDemes); j++){
-				if ( round(sqrt( abs(i-centerX )*abs(i-centerX ) + abs(j-centerY )*abs(j- centerY )) ) < patchS )
-				{
-					patchArr[i][j] = 1  ;  
-					labelUnique+=1;
-
+					cellList.push_back(i*nDemes + j);
 
 				}
+
 			}
+		}
+	}
+
+
+	for(int i = 0; i < int(nDemes); i++){
+		for(int j = 0; j < int(nDemes); j++){
+
+			patchArr[i][j] = 1 ;  
+
+
+
 		}
 	}
 
@@ -161,106 +235,163 @@ int main (int argc, char * argv[]){
 
 
 
+	/*int linPatchD = int(nDemes/(2*patchS +patchP ));
+
+	for(int xr = -int(linPatchD/2)+1; xr< int(linPatchD/2); xr++){
+		for(int yr = -int(linPatchD/2)+1; yr< int(linPatchD/2); yr++){
+			int xc= int(nDemes/2) +xr*(2*patchS +patchP);
+			int yc= int(nDemes/2) +yr*(2*patchS +patchP);
+			for(int i = 0; i < int(nDemes); i++){
+				for(int j = 0; j < int(nDemes); j++){
+
+					if ( round(sqrt( abs(i-int(xc))*abs(i-int(xc)) + abs(j-int(yc))*abs(j-int(yc))) ) < patchS)
+					{
+						patchArr[i][j]=1;
+						
 
 
-	//initialize random array for evoltuoion
-	for(int x=0; x< nDemes; x++){
+					}
 
-		jRand.push_back(x);
-		iRand.push_back(x);
-	}
+				}
 
 
-	/////------MAIN LOOP-----
-	int ii;
-	int jj;
+			}
+		}
+	}*/
+
+
+
+
+
+
+	int i;
+	int j;
+	int iP;
+	int jP;
+	int cellID;
+	int arrCoor[2];
+	int neighbDiff[4][2] = {{0,1},{0,-1},{1,0},{-1,0}}; //directions for negihbors
+	int neighbCoor[4][2]; // initialize array for neighbor coordinates
+	int ne;
+	int neighbID; 
+
+	//cout << cellList.size()<<endl;
+	for (int dt = 0 ; dt < nGen; dt++ ){
+		//cout << cellList.size()<<endl;
+
+		cellID = cellList[ gsl_rng_uniform_int(r, cellList.size() ) ] ;
+
+		j = cellID % nDemes;
+		i =  int(cellID/nDemes);
+		//vector <int> neighborPick {0,0};
+		int* neighborPick = pickEmpty(popArr, i,j,nDemes, r);
+		iP = neighborPick[0];
+		jP = neighborPick[1];
+
+
+
+
+
+		popArr[iP][jP] = popArr[i][j];
+
+
+		if ( patchArr[i][j] ==0 ){
+
+			popArr[i][j] = 0;
+
+
+			cellList.erase(remove(cellList.begin(), cellList.end(), i*nDemes+j), cellList.end()); 
+
+
+			int arr[2] = {i,j}; // store current lattice coordinates
+
+
+
+
+			for (int ne =0;ne<4;ne++){
+
+				neighbCoor[ne][0] = (arr[0] + nDemes+neighbDiff[ne][0]) % nDemes; 
+				neighbCoor[ne][1] = (arr[1] + nDemes+neighbDiff[ne][1]) % nDemes;
+				neighbID = neighbCoor[ne][0] * nDemes + neighbCoor[ne][1];
+
+				if (( popArr[neighbCoor[ne][0]][neighbCoor[ne][1]]  > 0  )  &&  (checkEmpty(popArr, neighbCoor[ne][0] ,neighbCoor[ne][1], nDemes) == 1 ) ){
+					
+					cellList.push_back(neighbID); 
+
+
+				}
+
+			}
+
+
+
+
+
+
+		} else{
+			lHistory.push_back(    make_tuple( popArr[i][j],i,j, iP,jP,  dt)   );
+		}
+
+		if ( checkEmpty(popArr, iP,jP, nDemes) == 1 && patchArr[i][j]==1 ) {
+
+
+			cellList.push_back(iP*nDemes+ jP);
+
+
+		}
 	
 
-	for (int dt = 0 ; dt < nGen; dt++ ){
+		int arr1[2] = {iP,jP}; // store current lattice coordinates
 
-		shuffle(iRand.begin(),iRand.end(),gen);
-		shuffle(jRand.begin(),jRand.end(),gen );
+		//int fullCount =0;
 
-		for(int i =0;i<nDemes;i++){
 
-			ii = iRand[i];
-			for (int j=0;j<nDemes;j++){
 
-				jj=jRand[j];
+		for (int ne =0;ne<4;ne++){
 
-				if (popArr[ii][jj] >0){
+			neighbCoor[ne][0] = (arr1[0] + nDemes+neighbDiff[ne][0]) % nDemes; 
+			neighbCoor[ne][1] = (arr1[1] + nDemes+neighbDiff[ne][1]) % nDemes;
+			neighbID = neighbCoor[ne][0] * nDemes + neighbCoor[ne][1];
 
-					int arr[2] = {ii, jj}; // store current lattice coordinates
-					int neighbDiff[4][2] = {{0,1},{0,-1},{1,0},{-1,0}}; //directions for negihbors
-					int neighbCorr[4][2]; // initialize array for neighbor coordinates
-					vector <int> neighbEmpty;
-					
+			if (( popArr[neighbCoor[ne][0]][neighbCoor[ne][1]]  > 0 ) &&  (checkEmpty(popArr, neighbCoor[ne][0] ,neighbCoor[ne][1], nDemes) == 0 ) ){
+				
+				cellList.erase(remove(cellList.begin(), cellList.end(), neighbID), cellList.end()); 
 
-					int emptCount=0;
-					for(int ne=0; ne <4; ne++){
-						 ///find x,u coordinate of neighbor respecting periodic boundaries
-						neighbCorr[ne][0] = (arr[0] + nDemes+neighbDiff[ne][0]) % nDemes; 
-						neighbCorr[ne][1] = (arr[1] + nDemes+neighbDiff[ne][1]) % nDemes;
 
-						if (popArr[ neighbCorr[ne][0] ][ neighbCorr[ne][1] ] ==0){
-
-							neighbEmpty.push_back(ne);
-							emptCount+=1;
-						}
-
-					}
-
-					if (emptCount>0){
-					
-						uniform_int_distribution<int> distribution_e(0,emptCount-1);
-						int nePick = distribution_e(generator);
-
-						popArr[ neighbCorr[ neighbEmpty[nePick] ] [0] ] [ neighbCorr[ neighbEmpty[nePick] ] [1] ] =popArr[ii][jj];
-
-						if (patchArr[ii][jj] ==0){
-
-							popArr[ii][jj] = 0;
-						} else{
-							lHistory.push_back(    make_tuple( popArr[ii][jj],ii,jj, neighbCorr[ neighbEmpty[nePick] ] [0],neighbCorr[ neighbEmpty[nePick] ] [1],  dt)   );
-						}
-					}
-				}
-			
 			}
 
 		}
-		
-	}
 
 
 
+	}	
 
-	//for(int i=0; i < lHistory.size();i++){
-	//	for( int j =0 j <)
+	cout <<lHistory.size()<<endl;
 
-	//		fhistory << lHistory[i] << endl;
-	//}
-
-
-    for (auto [ pID, pX, pY,cX,cY,T ] : lHistory)
-    {
-      fhist << pID << " " << pX << " " << pY << " "<<cX <<" "<<cY<< " "<< T << "\n"<<endl;
-    }
 
 
 	for(int i=0;i < nDemes; i++){
     	for(int j =0;j < nDemes; j++){
 
+
     		fprof << i << " " << j<< " " << popArr[i][j] << endl;
-    		fpatch<< i << " " << j << " " << patchArr[i][j] << endl;
- 
+    		fpatch << i << " " << j<< " " << patchArr[i][j] << endl;
+    		
 		}
 
     }
+    for (auto [ pID, pX, pY,cX,cY,T ] : lHistory)
+    {
+      fhist << pID << " " << pX << " " << pY << " "<<cX <<" "<<cY<< " "<< T << "\n"<<endl;
+    }
+    sort(cellList.begin(), cellList.end());
+	auto it = unique( cellList.begin(), cellList.end() );
+	bool wasUnique = (it == cellList.end() );
+	cout << wasUnique <<endl;
 
 
 
-    
+
 
 	flog.close();
     fprof.close();
@@ -276,9 +407,6 @@ int main (int argc, char * argv[]){
     cout << "Finished in " << run_time << " seconds \n";
 
 	puts (buffer);
-
-
-
 
 
 
